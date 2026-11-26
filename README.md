@@ -175,6 +175,12 @@ Open your browser:
 http://127.0.0.1:5000/
 ```
 
+### Step 6: Run the tests
+
+```bash
+python -m pytest -q
+```
+
 ## 8. HTTP Methods
 
 The application uses HTTP methods to handle task operations.

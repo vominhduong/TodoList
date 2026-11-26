@@ -1,22 +1,93 @@
 {% extends "base.html" %}
 
+{% set keep = {'status': status if status != 'all' else None, 'q': q or None} %}
+
 {% block content %}
 <h1 class="mb-4">📝 Todo List</h1>
 
-<form action="{{ url_for('main.create_task') }}" method="post" class="d-flex gap-2 mb-4">
-  <input type="text" name="title" class="form-control" placeholder="Thêm công việc mới..." required>
+<form action="{{ url_for('main.create_task', **keep) }}" method="post" class="d-flex gap-2 mb-4">
+  <input type="text" name="title" class="form-control" placeholder="Thêm công việc mới..."
+         maxlength="100" required autofocus>
   <button type="submit" class="btn btn-primary">Thêm</button>
 </form>
 
-<ul class="list-group">
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <ul class="nav nav-pills">
+    {% for key, label in [('all', 'Tất cả'), ('pending', 'Đang làm'), ('completed', 'Hoàn thành')] %}
+      <li class="nav-item">
+        <a class="nav-link py-1 px-3 {{ 'active' if status == key }}"
+           href="{{ url_for('main.index', status=(key if key != 'all' else None), q=(q or None)) }}">
+          {{ label }} <span class="badge text-bg-secondary">{{ counts[key] }}</span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <form action="{{ url_for('main.index') }}" method="get" class="d-flex gap-2">
+    {% if status != 'all' %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Tìm theo tiêu đề...">
+    <button type="submit" class="btn btn-sm btn-outline-secondary">Tìm</button>
+  </form>
+</div>
+
+<ul class="list-group mb-3">
   {% for task in tasks %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-      <span class="{{ 'done' if task.completed }}">{{ task.title }}</span>
-      <small class="text-muted">{{ task.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
-      {# TODO: thêm nút Toggle / Edit / Delete (mỗi nút là 1 form method="post") #}
+    <li class="list-group-item">
+      <div class="d-flex align-items-center gap-2 task-view">
+        <form action="{{ url_for('main.toggle_task', task_id=task.id, **keep) }}" method="post">
+          <input type="checkbox" class="form-check-input mt-0" onchange="this.form.submit()"
+                 title="Đổi trạng thái" {{ 'checked' if task.is_completed }}>
+        </form>
+        <div class="flex-grow-1 text-break">
+          <span class="{{ 'done' if task.is_completed }}">{{ task.title }}</span><br>
+          <small class="text-muted">{{ task.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary js-edit">Sửa</button>
+        <form action="{{ url_for('main.delete_task', task_id=task.id, **keep) }}" method="post"
+              onsubmit="return confirm('Xoá công việc này?');">
+          <button type="submit" class="btn btn-sm btn-outline-danger">Xoá</button>
+        </form>
+      </div>
+
+      <form action="{{ url_for('main.edit_task', task_id=task.id, **keep) }}" method="post"
+            class="d-none gap-2 task-edit">
+        <input type="text" name="title" value="{{ task.title }}" class="form-control form-control-sm"
+               maxlength="100" required>
+        <button type="submit" class="btn btn-sm btn-primary">Lưu</button>
+        <button type="button" class="btn btn-sm btn-light js-cancel">Huỷ</button>
+      </form>
     </li>
   {% else %}
-    <li class="list-group-item text-muted text-center">Chưa có công việc nào.</li>
+    <li class="list-group-item text-muted text-center">
+      {{ 'Không tìm thấy công việc phù hợp.' if q or status != 'all' else 'Chưa có công việc nào.' }}
+    </li>
   {% endfor %}
 </ul>
+
+{% if counts['completed'] %}
+  <form action="{{ url_for('main.clear_completed', **keep) }}" method="post" class="text-end"
+        onsubmit="return confirm('Xoá tất cả công việc đã hoàn thành?');">
+    <button type="submit" class="btn btn-sm btn-link text-danger">Xoá các việc đã hoàn thành</button>
+  </form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('.list-group-item').forEach(function (item) {
+    var view = item.querySelector('.task-view');
+    var edit = item.querySelector('.task-edit');
+    if (!view || !edit) return;
+    function show(editing) {
+      view.classList.toggle('d-none', editing);
+      view.classList.toggle('d-flex', !editing);
+      edit.classList.toggle('d-none', !editing);
+      edit.classList.toggle('d-flex', editing);
+      if (editing) edit.querySelector('input').select();
+    }
+    item.querySelector('.js-edit').addEventListener('click', function () { show(true); });
+    item.querySelector('.js-cancel').addEventListener('click', function () { show(false); });
+    edit.addEventListener('keydown', function (e) { if (e.key === 'Escape') show(false); });
+  });
+</script>
 {% endblock %}
